@@ -29,7 +29,7 @@ from evaluation.judge import LLMJudge
 # Load Dataset
 # ---------------------------
 def load_dataset(path: str) -> pd.DataFrame:
-    if path.endswith(".xlsx"):
+    if path.endswith(".csv"):
         df = pd.read_csv(path)
     elif path.endswith(".json"):
         df = pd.read_json(path)
