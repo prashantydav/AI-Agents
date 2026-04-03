@@ -4,6 +4,44 @@ import json
 
 from typing import List
 
+
+import json
+import ast
+import pandas as pd
+
+def safe_parse_metadata(x):
+    # Handle NaN
+    if pd.isna(x):
+        return {}
+
+    # Already dict
+    if isinstance(x, dict):
+        return x
+
+    # Not string
+    if not isinstance(x, str):
+        return {}
+
+    x = x.strip()
+
+    # Fix missing braces
+    if not x.startswith("{"):
+        x = "{" + x
+    if not x.endswith("}"):
+        x = x + "}"
+
+    # Try JSON
+    try:
+        return json.loads(x)
+    except:
+        pass
+
+    # Try Python dict
+    try:
+        return ast.literal_eval(x)
+    except:
+        return {}
+
 # Config
 from config import (
     MODEL_CONFIGS,
@@ -28,6 +66,14 @@ from evaluation.judge import LLMJudge
 # ---------------------------
 # Load Dataset
 # ---------------------------
+
+
+def enrich_metadata(meta):
+    meta.setdefault("evaluation_type", "fuzzy")
+    meta.setdefault("category", "qa")
+    return meta
+
+
 def load_dataset(path: str) -> pd.DataFrame:
     if path.endswith(".csv"):
         df = pd.read_csv(path)
@@ -38,9 +84,11 @@ def load_dataset(path: str) -> pd.DataFrame:
 
     # Ensure metadata is dict
     if isinstance(df.iloc[0]["metadata"], str):
-        df["metadata"] = df["metadata"].apply(json.loads)
+        df["metadata"] = df["metadata"].apply(safe_parse_metadata)
+        df["metadata"] = df["metadata"].apply(enrich_metadata)
 
     return df
+
 
 
 # ---------------------------
