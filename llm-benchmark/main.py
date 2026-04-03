@@ -1,6 +1,7 @@
 import pandas as pd
 import time
 import json
+import os
 
 from typing import List
 
@@ -242,6 +243,10 @@ if __name__ == "__main__":
     results_df = run_benchmark(df, models, judge)
 
     print("💾 Saving results...")
+
+    # Create directory if it doesn't exist
+    os.makedirs("results", exist_ok=True)
+
     results_df.to_csv(SAVE_RESULTS_PATH, index=False)
 
     print("📊 Analyzing results...")
