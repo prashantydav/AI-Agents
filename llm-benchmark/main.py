@@ -3,12 +3,13 @@ import time
 import json
 import os
 
+import time
+
 from typing import List
 
 
 import json
 import ast
-import pandas as pd
 
 def safe_parse_metadata(x):
     # Handle NaN
@@ -225,6 +226,105 @@ def run_benchmark(df: pd.DataFrame, models: List[OllamaModel], judge=None) -> pd
     return pd.DataFrame(results)
 
 
+
+def run_absa_benchmark(df: pd.DataFrame, models: List, judge=None) -> pd.DataFrame:
+
+    results = []
+
+    for model in models:
+        print(f"\n🚀 Running model: {model.model_name}")
+
+        for idx, row in df.iterrows():
+
+            text = row["translated_text"]
+            aspect = row["Keyword"]
+            ground_truth = row["Sentiment"]
+
+            metadata = row.get("metadata", {})
+            eval_type = metadata.get("evaluation_type", "exact_match")
+
+            # ---------------------------
+            # ABSA Prompt
+            # ---------------------------
+            prompt = f"""
+            You are performing Aspect-Based Sentiment Analysis.
+
+            STRICT INSTRUCTIONS:
+            - Identify sentiment ONLY for the given aspect
+            - Return ONLY one word: Positive / Negative / Neutral
+            - Do NOT explain
+            - Do NOT add extra text
+
+            Text:
+            {text}
+
+            Aspect:
+            {aspect}
+
+            Sentiment:
+            """
+
+            # ---------------------------
+            # Generate Output
+            # ---------------------------
+            start_time = time.time()
+            output = model.generate(prompt).strip()
+            latency = time.time() - start_time
+
+            # Normalize output (important)
+            output = output.split("\n")[0].strip()
+
+            # ---------------------------
+            # Metric Score
+            # ---------------------------
+            metric_score = compute_score(
+                pred=output,
+                gt=ground_truth,
+                eval_type=eval_type
+            )
+
+            # ---------------------------
+            # Judge Score
+            # ---------------------------
+            judge_score = None
+            judge_reason = None
+
+            if judge:
+                judge_result = judge.judge(prompt, output, ground_truth)
+                judge_score = judge_result.get("score", 0)
+                judge_reason = judge_result.get("reason", "")
+
+            # ---------------------------
+            # Final Score
+            # ---------------------------
+            if judge_score is not None:
+                final_score = 0.5 * metric_score + 0.5 * (judge_score / 5)
+            else:
+                final_score = metric_score
+
+            # ---------------------------
+            # Store Result
+            # ---------------------------
+            results.append({
+                "model": model.model_name,
+                "test_id": idx,
+                "category": metadata.get("category", "absa"),
+                "text": text,
+                "aspect": aspect,
+                "ground_truth": ground_truth,
+                "output": output,
+                "metric_score": metric_score,
+                "judge_score": judge_score,
+                "final_score": final_score,
+                "latency": latency,
+                "judge_reason": judge_reason
+            })
+
+            if VERBOSE:
+                print(f"✔ Test {idx} | GT: {ground_truth} | Pred: {output} | Score: {final_score:.2f}")
+
+    return pd.DataFrame(results)
+
 # ---------------------------
 # Analysis
 # ---------------------------
@@ -256,7 +356,8 @@ if __name__ == "__main__":
     judge = init_judge()
 
     print("🚀 Running benchmark...")
-    results_df = run_benchmark(df, models, judge)
+    # results_df = run_benchmark(df, models, judge)
+    results_df = run_absa_benchmark(df, models, judge)
 
     print("💾 Saving results...")
 
