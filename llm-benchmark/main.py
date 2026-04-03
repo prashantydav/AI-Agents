@@ -144,7 +144,23 @@ def run_benchmark(df: pd.DataFrame, models: List[OllamaModel], judge=None) -> pd
 
         for idx, row in df.iterrows():
 
-            prompt = row["problem"]
+            raw_prompt = row["problem"]
+
+            prompt = f"""
+            Answer the following question.
+
+            STRICT INSTRUCTIONS:
+            - Return ONLY the final answer
+            - Do NOT explain
+            - Do NOT add extra words
+            - Do NOT add sentences
+            - Output must be short and exact
+
+            Question:
+            {raw_prompt}
+
+            Answer:
+            """
             ground_truth = row["answer"]
             metadata = row.get("metadata", {})
 
