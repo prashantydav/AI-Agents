@@ -37,8 +37,8 @@ def load_dataset(path: str) -> pd.DataFrame:
         raise ValueError("Unsupported file format")
 
     # Ensure metadata is dict
-    # if isinstance(df.iloc[0]["metadata"], str):
-    #     df["metadata"] = df["metadata"].apply(json.loads)
+    if isinstance(df.iloc[0]["metadata"], str):
+        df["metadata"] = df["metadata"].apply(json.loads)
 
     return df
 
