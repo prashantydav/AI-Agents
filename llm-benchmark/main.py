@@ -79,7 +79,7 @@ def enrich_metadata(meta):
 def load_dataset(path: str) -> pd.DataFrame:
     if path.endswith(".xlsx"):
         df = pd.read_excel(path)
-    if path.endswith(".csv"):
+    elif path.endswith(".csv"):
         df = pd.read_csv(path)
     elif path.endswith(".json"):
         df = pd.read_json(path)
