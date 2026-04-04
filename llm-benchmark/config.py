@@ -18,20 +18,40 @@ OLLAMA_BASE_URL = "http://localhost:11434/api/generate"
 MODEL_CONFIGS = [
     {
         "name": "llama3",
+        "provider": "ollama",
         "temperature": 0.2,
         "max_tokens": 512
     },
     {
         "name": "mistral",
+        "provider": "ollama",
         "temperature": 0.2,
         "max_tokens": 512
     },
     {
         "name": "phi3",
+        "provider": "ollama",
         "temperature": 0.2,
         "max_tokens": 512
-    }
+    },
+    {
+        "name": "gpt-4o",
+        "provider": "openai",
+        "temperature": 0.2,
+        "max_tokens": 512
+    },
 ]
+
+
+# ---------------------------
+# Judge Model
+# ---------------------------
+JUDGE_MODEL = {
+    "name": "llama3",
+    "provider": "ollama",
+    "temperature": 0.0,
+    "max_tokens": 512
+}
 
 
 # ---------------------------

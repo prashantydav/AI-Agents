@@ -59,6 +59,7 @@ from config import (
 
 # Model
 from models.ollama import OllamaModel
+from models.openai import OpenAIModel
 
 # Evaluation
 from evaluation.metrics import compute_score
@@ -94,6 +95,9 @@ def load_dataset(path: str) -> pd.DataFrame:
     return df
 
 
+import os
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
 
 # ---------------------------
 # Initialize Models
@@ -102,17 +106,24 @@ def init_models() -> List[OllamaModel]:
     models = []
 
     for cfg in MODEL_CONFIGS:
-        models.append(
-            OllamaModel(
-                model_name=cfg["name"],
-                base_url=OLLAMA_BASE_URL,
-                temperature=cfg["temperature"],
-                max_tokens=cfg["max_tokens"],
-                timeout=REQUEST_TIMEOUT,
-                retry_count=RETRY_COUNT
-            )
-        )
 
+        if cfg["provider"] == "ollama":
+            models.append(
+                OllamaModel(
+                    model_name=cfg["name"],
+                    base_url=OLLAMA_BASE_URL,
+                    temperature=cfg["temperature"],
+                    max_tokens=cfg["max_tokens"],
+                    timeout=REQUEST_TIMEOUT,
+                    retry_count=RETRY_COUNT
+                )
+            )
+        if cfg["provider"] == "openai":
+            models.append(
+                OpenAIModel(
+                    api_key=OPENAI_API_KEY,
+                )
+            )
     return models
 
 
