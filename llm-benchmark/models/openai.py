@@ -5,7 +5,7 @@ class OpenAIModel:
     def __init__(self, api_key, model="gpt-4o-mini"):
         self.client = OpenAI(api_key=api_key)
         self.model = model
-        self.name = "GPT-4o"
+        self.model_name = "GPT-4o"
 
         # Pricing (approx, update if needed)
         self.input_cost_per_1k = 0.00015   # $ per 1K tokens
