@@ -235,7 +235,7 @@ def run_absa_benchmark(df: pd.DataFrame, models: List, judge=None) -> pd.DataFra
 
     for model in models:
         print(f"\n🚀 Running model: {model.model_name}")
-
+        print(df.columns)
         for idx, row in df.iterrows():
 
             text = row["translated_text"]
