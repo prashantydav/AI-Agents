@@ -102,7 +102,7 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 # ---------------------------
 # Initialize Models
 # ---------------------------
-def init_models() -> List[OllamaModel]:
+def init_models() -> List:
     models = []
 
     for cfg in MODEL_CONFIGS:
