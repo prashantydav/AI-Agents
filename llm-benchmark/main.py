@@ -254,7 +254,8 @@ def run_absa_benchmark(df: pd.DataFrame, models: List, judge=None) -> pd.DataFra
             ground_truth = row["Sentiment"]
 
             metadata = row.get("metadata", {})
-            eval_type = metadata.get("evaluation_type", "exact_match")
+            # eval_type = metadata.get("evaluation_type", "exact_match")
+            eval_type = "exact_match"
 
             # ---------------------------
             # ABSA Prompt
