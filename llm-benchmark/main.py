@@ -291,6 +291,9 @@ def run_absa_benchmark(df: pd.DataFrame, models: List, judge=None) -> pd.DataFra
             # ---------------------------
             # Metric Score
             # ---------------------------
+            if model.model_name == "GPT-4o":
+                output = output["output"]
+                print(f"Raw output: {output}")
             metric_score = compute_score(
                 pred=output,
                 gt=ground_truth,
