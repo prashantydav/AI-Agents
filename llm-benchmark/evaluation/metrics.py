@@ -8,6 +8,7 @@ from difflib import SequenceMatcher
 # Exact Match
 # ---------------------------
 def exact_match(pred: str, gt: str) -> int:
+    print(pred, gt)
     if pred is None or gt is None:
         return 0
     return int(pred.strip() == gt.strip())
