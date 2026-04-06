@@ -285,7 +285,7 @@ def run_absa_benchmark(df: pd.DataFrame, models: List, judge=None) -> pd.DataFra
             latency = time.time() - start_time
 
             # Normalize output (important)
-            output = output.split("\n")[0].strip()
+            output = output.split("\n")[0]
 
             # ---------------------------
             # Metric Score
