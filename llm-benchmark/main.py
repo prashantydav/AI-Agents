@@ -281,7 +281,7 @@ def run_absa_benchmark(df: pd.DataFrame, models: List, judge=None) -> pd.DataFra
             # Generate Output
             # ---------------------------
             start_time = time.time()
-            output = model.generate(prompt).strip()
+            output = model.generate(prompt)
             latency = time.time() - start_time
 
             # Normalize output (important)
