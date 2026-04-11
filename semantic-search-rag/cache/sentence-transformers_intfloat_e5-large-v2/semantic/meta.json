@@ -1,0 +1,6 @@
+{
+  "strategy": "semantic",
+  "source_hash": "62eab7e60557419ee5e26ffe77c485c021bf5fe2c12b616a3a870272bc039b84",
+  "model_key": "sentence-transformers_intfloat_e5-large-v2",
+  "count": 5
+}
