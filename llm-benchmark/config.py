@@ -7,6 +7,7 @@ load_dotenv()
 
 HF_MODEL_PATH_1 = os.getenv("HF_MODEL_PATH_1", "/path/to/downloaded-models/google/gemma-2-2b-it")
 HF_MODEL_PATH_2 = os.getenv("HF_MODEL_PATH_2", "/path/to/downloaded-models/Qwen/Qwen2.5-3B-Instruct")
+HF_MODEL_PATH_3 = os.getenv("HF_MODEL_PATH_3", "/path/to/downloaded-models/deepseek-ai/DeepSeek-R1-Distill-Qwen-7B")
 
 # ---------------------------
 # Dataset
