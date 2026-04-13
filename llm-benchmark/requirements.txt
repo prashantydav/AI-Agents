@@ -4,3 +4,7 @@ anthropic
 ollama
 datasets
 pandas
+matplotlib
+transformers
+torch
+python-dotenv

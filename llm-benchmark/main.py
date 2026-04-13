@@ -1,15 +1,15 @@
-import pandas as pd
-import time
-import json
 import os
-
+import ast
+import json
 import time
+
+import matplotlib.pyplot as plt
+import pandas as pd
+from dotenv import load_dotenv
 
 from typing import List
 
-
-import json
-import ast
+load_dotenv()
 
 def safe_parse_metadata(x):
     # Handle NaN
@@ -60,6 +60,7 @@ from config import (
 # Model
 from models.ollama import OllamaModel
 from models.openai import OpenAIModel
+from models.huggingface import HuggingFaceModel
 
 # Evaluation
 from evaluation.metrics import compute_score
@@ -94,9 +95,29 @@ def load_dataset(path: str) -> pd.DataFrame:
 
     return df
 
-
-import os
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+
+
+def unwrap_model_output(raw_output):
+    if isinstance(raw_output, dict):
+        output = raw_output.get("output")
+        if output is None:
+            return raw_output.get("error", "")
+        return str(output).strip()
+    if raw_output is None:
+        return ""
+    return str(raw_output).strip()
+
+
+def ensure_results_dirs(base_path: str = "results"):
+    os.makedirs(base_path, exist_ok=True)
+    insights_dir = os.path.join(base_path, "insights")
+    plots_dir = os.path.join(insights_dir, "plots")
+    os.makedirs(insights_dir, exist_ok=True)
+    os.makedirs(plots_dir, exist_ok=True)
+    return insights_dir, plots_dir
 
 
 # ---------------------------
@@ -118,10 +139,23 @@ def init_models() -> List:
                     retry_count=RETRY_COUNT
                 )
             )
-        if cfg["provider"] == "openai":
+        elif cfg["provider"] == "openai":
             models.append(
                 OpenAIModel(
                     api_key=OPENAI_API_KEY,
+                    model=cfg["name"]
+                )
+            )
+        elif cfg["provider"] == "huggingface":
+            model_path = cfg.get("path", cfg.get("name"))
+            models.append(
+                HuggingFaceModel(
+                    model_path=model_path,
+                    model_name=cfg.get("name"),
+                    temperature=cfg["temperature"],
+                    max_tokens=cfg["max_tokens"],
+                    timeout=REQUEST_TIMEOUT,
+                    retry_count=RETRY_COUNT
                 )
             )
     return models
@@ -149,7 +183,7 @@ def init_judge():
 # ---------------------------
 # Benchmark Runner
 # ---------------------------
-def run_benchmark(df: pd.DataFrame, models: List[OllamaModel], judge=None) -> pd.DataFrame:
+def run_benchmark(df: pd.DataFrame, models: List, judge=None) -> pd.DataFrame:
 
     results = []
 
@@ -184,7 +218,8 @@ def run_benchmark(df: pd.DataFrame, models: List[OllamaModel], judge=None) -> pd
             # Generate Output
             # ---------------------------
             start_time = time.time()
-            output = model.generate(prompt)
+            raw_output = model.generate(prompt)
+            output = unwrap_model_output(raw_output)
             latency = time.time() - start_time
 
             # ---------------------------
@@ -282,7 +317,8 @@ def run_absa_benchmark(df: pd.DataFrame, models: List, judge=None) -> pd.DataFra
             # Generate Output
             # ---------------------------
             start_time = time.time()
-            output = model.generate(prompt)
+            raw_output = model.generate(prompt)
+            output = unwrap_model_output(raw_output)
             latency = time.time() - start_time
 
             # Normalize output (important)
@@ -291,9 +327,6 @@ def run_absa_benchmark(df: pd.DataFrame, models: List, judge=None) -> pd.DataFra
             # ---------------------------
             # Metric Score
             # ---------------------------
-            if model.model_name == "GPT-4o":
-                output = output["output"]
-                print(f"Raw output: {output}")
             metric_score = compute_score(
                 pred=output,
                 gt=ground_truth,
@@ -346,15 +379,105 @@ def run_absa_benchmark(df: pd.DataFrame, models: List, judge=None) -> pd.DataFra
 # Analysis
 # ---------------------------
 def analyze_results(df: pd.DataFrame):
+    insights_dir, plots_dir = ensure_results_dirs("results")
+
+    overall = (
+        df.groupby("model", as_index=False)
+        .agg(
+            avg_final_score=("final_score", "mean"),
+            avg_metric_score=("metric_score", "mean"),
+            avg_latency=("latency", "mean"),
+            samples=("test_id", "count"),
+        )
+        .sort_values("avg_final_score", ascending=False)
+    )
+
+    by_category = (
+        df.groupby(["model", "category"], as_index=False)["final_score"]
+        .mean()
+        .rename(columns={"final_score": "avg_final_score"})
+    )
 
     print("\n📊 Overall Performance:\n")
-    print(df.groupby("model")["final_score"].mean())
+    print(overall.set_index("model")["avg_final_score"])
 
     print("\n📊 Category-wise Performance:\n")
-    print(df.groupby(["model", "category"])["final_score"].mean())
+    print(by_category.set_index(["model", "category"])["avg_final_score"])
 
     print("\n⏱ Average Latency:\n")
-    print(df.groupby("model")["latency"].mean())
+    print(overall.set_index("model")["avg_latency"])
+
+    overall.to_csv(os.path.join(insights_dir, "overall_summary.csv"), index=False)
+    by_category.to_csv(os.path.join(insights_dir, "category_summary.csv"), index=False)
+
+    # Bar chart: avg final score by model
+    plt.figure(figsize=(10, 6))
+    plt.bar(overall["model"], overall["avg_final_score"])
+    plt.title("Average Final Score by Model")
+    plt.xlabel("Model")
+    plt.ylabel("Average Final Score")
+    plt.xticks(rotation=20, ha="right")
+    plt.tight_layout()
+    plt.savefig(os.path.join(plots_dir, "avg_final_score_by_model.png"))
+    plt.close()
+
+    # Bar chart: avg latency by model
+    plt.figure(figsize=(10, 6))
+    plt.bar(overall["model"], overall["avg_latency"])
+    plt.title("Average Latency by Model")
+    plt.xlabel("Model")
+    plt.ylabel("Latency (seconds)")
+    plt.xticks(rotation=20, ha="right")
+    plt.tight_layout()
+    plt.savefig(os.path.join(plots_dir, "avg_latency_by_model.png"))
+    plt.close()
+
+    # Grouped bars per category/model
+    pivot = by_category.pivot(index="category", columns="model", values="avg_final_score").fillna(0)
+    ax = pivot.plot(kind="bar", figsize=(12, 7))
+    ax.set_title("Average Final Score by Category and Model")
+    ax.set_xlabel("Category")
+    ax.set_ylabel("Average Final Score")
+    plt.xticks(rotation=20, ha="right")
+    plt.tight_layout()
+    plt.savefig(os.path.join(plots_dir, "avg_final_score_by_category.png"))
+    plt.close()
+
+    best_model = overall.iloc[0].to_dict() if not overall.empty else {}
+    fastest_model = overall.sort_values("avg_latency").iloc[0].to_dict() if not overall.empty else {}
+
+    insights = {
+        "best_model_by_final_score": best_model,
+        "fastest_model_by_latency": fastest_model,
+        "overall_model_summary_file": os.path.join(insights_dir, "overall_summary.csv"),
+        "category_summary_file": os.path.join(insights_dir, "category_summary.csv"),
+        "plots": {
+            "avg_final_score_by_model": os.path.join(plots_dir, "avg_final_score_by_model.png"),
+            "avg_latency_by_model": os.path.join(plots_dir, "avg_latency_by_model.png"),
+            "avg_final_score_by_category": os.path.join(plots_dir, "avg_final_score_by_category.png"),
+        },
+    }
+
+    with open(os.path.join(insights_dir, "insights.json"), "w", encoding="utf-8") as f:
+        json.dump(insights, f, indent=2)
+
+    with open(os.path.join(insights_dir, "insights.txt"), "w", encoding="utf-8") as f:
+        if best_model:
+            f.write(
+                "Best model by final score: "
+                f"{best_model['model']} ({best_model['avg_final_score']:.4f})\n"
+            )
+        if fastest_model:
+            f.write(
+                "Fastest model by latency: "
+                f"{fastest_model['model']} ({fastest_model['avg_latency']:.4f}s)\n"
+            )
+        f.write(
+            "Saved plots:\n"
+            f"- {os.path.join(plots_dir, 'avg_final_score_by_model.png')}\n"
+            f"- {os.path.join(plots_dir, 'avg_latency_by_model.png')}\n"
+            f"- {os.path.join(plots_dir, 'avg_final_score_by_category.png')}\n"
+        )
 
 
 # ---------------------------

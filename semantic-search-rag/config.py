@@ -32,6 +32,7 @@ def _get_float_env(name: str, default: float) -> float:
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
 CHROMA_PERSIST_DIR = Path(os.getenv("CHROMA_PERSIST_DIR", str(ROOT_DIR / "chroma_db")))
 CACHE_DIR = Path(os.getenv("EMBEDDING_CACHE_DIR", str(ROOT_DIR / "cache")))
@@ -51,5 +52,9 @@ COMPLETION_MODEL = os.getenv("OPENAI_COMPLETION_MODEL", "gpt-3.5-turbo")
 CHUNK_SIZE = _get_int_env("CHUNK_SIZE", 800)
 CHUNK_OVERLAP = _get_int_env("CHUNK_OVERLAP", 200)
 TOP_K = _get_int_env("TOP_K", 5)
-MMR_LAMBDA = _get_float_env("MMR_LAMBDA", 0.6)
+MMR_LAMBDA = _get_float_env("MMR_LAMBDA", 1)
 BATCH_SIZE = _get_int_env("BATCH_SIZE", 16)
+MAX_CONCURRENCY_WORKERS = _get_int_env("MAX_CONCURRENCY_WORKERS", 4)
+REDIS_QUERY_EMBEDDING_TTL = _get_int_env("REDIS_QUERY_EMBEDDING_TTL", 3600)
+REDIS_SEARCH_TTL = _get_int_env("REDIS_SEARCH_TTL", 300)
+REDIS_CHAT_TTL = _get_int_env("REDIS_CHAT_TTL", 300)

@@ -142,14 +142,16 @@ class EmbeddingCache:
         self,
         strategy: str,
         source_hash: str,
+        namespace: str,
         model_key: str = None,
         cache_root: Path = CACHE_DIR,
     ):
         self.strategy = strategy
         self.source_hash = source_hash
+        self.namespace = namespace
         self.model_key = model_key or f"{EMBEDDING_PROVIDER}_{EMBEDDING_MODEL}"
-        # Create cache directory scoped by strategy and model
-        self.cache_dir = cache_root / self.model_key / strategy
+        # Create cache directory scoped by model, source namespace, and strategy.
+        self.cache_dir = cache_root / self.model_key / self.namespace / strategy
         _ensure_dir(self.cache_dir)
         self.meta_path = self.cache_dir / "meta.json"
         self.chunks_path = self.cache_dir / "chunks.json"
@@ -180,6 +182,7 @@ class EmbeddingCache:
             json.dumps(
                 {
                     "strategy": self.strategy,
+                    "namespace": self.namespace,
                     "source_hash": self.source_hash,
                     "model_key": self.model_key,
                     "count": len(chunks),
@@ -249,3 +252,11 @@ def embed_texts(
         return embed_texts_sentence_transformers(texts, batch_size=batch_size, model=model)
     else:
         raise ValueError(f"Unknown embedding provider: {provider}. Supported: openai, sentence-transformers")
+
+
+def current_model_key(provider: str = EMBEDDING_PROVIDER) -> str:
+    if provider == "openai":
+        return f"openai_{EMBEDDING_MODEL}"
+    if provider == "sentence-transformers":
+        return f"sentence-transformers_{SENTENCE_TRANSFORMER_MODEL.replace('/', '_')}"
+    return provider

@@ -27,6 +27,7 @@ Update the values there before running the app.
 ```dotenv
 OPENAI_API_KEY=
 BACKEND_URL=http://localhost:8000
+REDIS_URL=redis://localhost:6379/0
 CHROMA_PERSIST_DIR=/home/prashant/AI-Agents/semantic-search-rag/chroma_db
 EMBEDDING_CACHE_DIR=/home/prashant/AI-Agents/semantic-search-rag/cache
 DATA_DIR=/home/prashant/AI-Agents/semantic-search-rag/data
@@ -40,6 +41,10 @@ CHUNK_OVERLAP=200
 TOP_K=5
 MMR_LAMBDA=0.6
 BATCH_SIZE=16
+MAX_CONCURRENCY_WORKERS=4
+REDIS_QUERY_EMBEDDING_TTL=3600
+REDIS_SEARCH_TTL=300
+REDIS_CHAT_TTL=300
 ```
 
 3. Choose your embedding model: OpenAI (default) or Sentence Transformers
@@ -58,10 +63,33 @@ SENTENCE_TRANSFORMER_MODEL="intfloat/e5-large-v2"
 SENTENCE_TRANSFORMER_DEVICE="cuda"  # or "cpu"
 ```
 
-4. Ingest the sample corpus:
+4. Put your source files inside `data/` or point ingestion at a specific file/folder.
+
+Supported formats:
+- `csv`
+- `xlsx`
+- `xls`
+- `pdf`
+- `docx`
+- `txt`
+- `md`
+- `json`
+
+The loader will scan directories recursively and normalize those sources into the internal document format used by the RAG pipeline.
+
+5. Ingest the corpus:
 
 ```bash
 python ingest.py --strategy semantic
+```
+
+Examples:
+
+```bash
+python ingest.py --source data
+python ingest.py --source data/company-handbook.pdf
+python ingest.py --source data/quarterly_reports
+python ingest.py --source data/sales.xlsx
 ```
 
 ## Run the backend
@@ -88,12 +116,27 @@ streamlit run streamlit_app.py
 - `POST /chat` - generate a RAG-powered answer with cited sources
 - `POST /reload` - drop cached stores and reload
 
-## Corpus format
+## Performance
 
-The sample data file is at `data/sample_docs.csv` and expects columns:
-- `id`
-- `title`
-- `text`
+The backend now uses:
+- concurrent preparation of per-source vector stores
+- concurrent fan-out querying across source stores
+- Redis caching for query embeddings, search responses, and chat responses
+- cache keys scoped by corpus hash, embedding provider, and model so changed source content invalidates old query caches
+
+If Redis is not installed or not reachable, the application falls back to filesystem embedding cache plus Chroma persistence.
+
+## Source handling
+
+How each format is converted:
+- `csv`: if columns `id`, `title`, and `text` exist, each row becomes a document; otherwise each row is flattened into key/value text
+- `xlsx` and `xls`: each row in each sheet becomes a document
+- `pdf`: each page becomes a document
+- `docx`: the full document text becomes a document
+- `txt` and `md`: the full file becomes a document
+- `json`: tabular JSON arrays are flattened into document text
+
+Each retrieved chunk keeps source metadata such as file path, file type, and when applicable page number, sheet name, or row number.
 
 ## Model comparison
 
@@ -105,10 +148,12 @@ The sample data file is at `data/sample_docs.csv` and expects columns:
 ## Embedding Cache & Storage
 
 Each embedding model gets its own namespace:
-- `cache/{model_key}/{strategy}/` - embedding cache with metadata
-- `chroma_db/{model_key}/{strategy}/` - ChromaDB persistent storage
+- `cache/{model_key}/{source_hash}/{strategy}/` - embedding cache with metadata
+- `chroma_db/{model_key}/{source_hash}/{strategy}/` - ChromaDB persistent storage
 
 This allows you to switch between embedding models without collision.
+
+For source-level storage, the runtime now creates one vector database namespace per unique source content hash. If the same source is ingested again without content changes, the existing cache/vector store is reused and a duplicate database is not created.
 
 ## Notes
 
