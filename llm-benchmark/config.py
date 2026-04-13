@@ -107,3 +107,8 @@ SAVE_RESULTS_PATH = "results/output.csv"
 REQUEST_TIMEOUT = 60
 RETRY_COUNT = 2
 VERBOSE = True
+
+# Model loading strategy:
+# - all_at_once: load all configured models first, then evaluate.
+# - one_by_one: load/evaluate/analyze/release each model sequentially.
+MODEL_LOADING_STRATEGY = os.getenv("MODEL_LOADING_STRATEGY", "all_at_once")

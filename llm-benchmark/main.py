@@ -2,6 +2,8 @@ import os
 import ast
 import json
 import time
+import gc
+import re
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -47,6 +49,7 @@ def safe_parse_metadata(x):
 # Config
 from config import (
     MODEL_CONFIGS,
+    MODEL_LOADING_STRATEGY,
     JUDGE_MODEL,
     OLLAMA_BASE_URL,
     DATASET_PATH,
@@ -111,54 +114,71 @@ def unwrap_model_output(raw_output):
     return str(raw_output).strip()
 
 
-def ensure_results_dirs(base_path: str = "results"):
+def ensure_results_dirs(base_path: str = "results", scope: str = "overall"):
     os.makedirs(base_path, exist_ok=True)
-    insights_dir = os.path.join(base_path, "insights")
+    insights_dir = os.path.join(base_path, "insights", scope)
     plots_dir = os.path.join(insights_dir, "plots")
     os.makedirs(insights_dir, exist_ok=True)
     os.makedirs(plots_dir, exist_ok=True)
     return insights_dir, plots_dir
 
 
+def sanitize_name(value: str) -> str:
+    return re.sub(r"[^a-zA-Z0-9._-]+", "_", value).strip("_") or "model"
+
+
+def release_model_resources(model):
+    if hasattr(model, "unload"):
+        try:
+            model.unload()
+        except Exception:
+            pass
+
+    try:
+        import torch
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+    except Exception:
+        pass
+
+    gc.collect()
+
+
 # ---------------------------
 # Initialize Models
 # ---------------------------
-def init_models() -> List:
-    models = []
+def init_model(cfg: dict):
+    if cfg["provider"] == "ollama":
+        return OllamaModel(
+            model_name=cfg["name"],
+            base_url=OLLAMA_BASE_URL,
+            temperature=cfg["temperature"],
+            max_tokens=cfg["max_tokens"],
+            timeout=REQUEST_TIMEOUT,
+            retry_count=RETRY_COUNT
+        )
+    elif cfg["provider"] == "openai":
+        return OpenAIModel(
+            api_key=OPENAI_API_KEY,
+            model=cfg["name"]
+        )
+    elif cfg["provider"] == "huggingface":
+        model_path = cfg.get("path", cfg.get("name"))
+        return HuggingFaceModel(
+            model_path=model_path,
+            model_name=cfg.get("name"),
+            temperature=cfg["temperature"],
+            max_tokens=cfg["max_tokens"],
+            timeout=REQUEST_TIMEOUT,
+            retry_count=RETRY_COUNT
+        )
+    else:
+        raise ValueError(f"Unsupported model provider: {cfg.get('provider')}")
 
-    for cfg in MODEL_CONFIGS:
 
-        if cfg["provider"] == "ollama":
-            models.append(
-                OllamaModel(
-                    model_name=cfg["name"],
-                    base_url=OLLAMA_BASE_URL,
-                    temperature=cfg["temperature"],
-                    max_tokens=cfg["max_tokens"],
-                    timeout=REQUEST_TIMEOUT,
-                    retry_count=RETRY_COUNT
-                )
-            )
-        elif cfg["provider"] == "openai":
-            models.append(
-                OpenAIModel(
-                    api_key=OPENAI_API_KEY,
-                    model=cfg["name"]
-                )
-            )
-        elif cfg["provider"] == "huggingface":
-            model_path = cfg.get("path", cfg.get("name"))
-            models.append(
-                HuggingFaceModel(
-                    model_path=model_path,
-                    model_name=cfg.get("name"),
-                    temperature=cfg["temperature"],
-                    max_tokens=cfg["max_tokens"],
-                    timeout=REQUEST_TIMEOUT,
-                    retry_count=RETRY_COUNT
-                )
-            )
-    return models
+def init_models(model_configs: List[dict] = None) -> List:
+    configs = model_configs if model_configs is not None else MODEL_CONFIGS
+    return [init_model(cfg) for cfg in configs]
 
 
 # ---------------------------
@@ -378,8 +398,12 @@ def run_absa_benchmark(df: pd.DataFrame, models: List, judge=None) -> pd.DataFra
 # ---------------------------
 # Analysis
 # ---------------------------
-def analyze_results(df: pd.DataFrame):
-    insights_dir, plots_dir = ensure_results_dirs("results")
+def analyze_results(df: pd.DataFrame, scope: str = "overall"):
+    if df is None or df.empty:
+        print(f"⚠️ No results available to analyze for scope: {scope}")
+        return
+
+    insights_dir, plots_dir = ensure_results_dirs("results", scope)
 
     overall = (
         df.groupby("model", as_index=False)
@@ -489,24 +513,66 @@ if __name__ == "__main__":
     df = load_dataset(DATASET_PATH)
     df = df.head(25)
 
-    print("🤖 Initializing models...")
-    models = init_models()
-
     print("⚖️ Initializing judge...")
     judge = init_judge()
 
-    print("🚀 Running benchmark...")
-    # results_df = run_benchmark(df, models, judge)
-    results_df = run_absa_benchmark(df, models, judge)
-
-    print("💾 Saving results...")
-
-    # Create directory if it doesn't exist
     os.makedirs("results", exist_ok=True)
+    benchmark_runner = run_absa_benchmark  # Keep existing default workflow.
 
-    results_df.to_csv(SAVE_RESULTS_PATH, index=False)
+    strategy = (MODEL_LOADING_STRATEGY or "all_at_once").strip().lower()
+    print(f"🧭 Model loading strategy: {strategy}")
 
-    print("📊 Analyzing results...")
-    analyze_results(results_df)
+    if strategy == "all_at_once":
+        print("🤖 Initializing all models...")
+        models = init_models()
+
+        print("🚀 Running benchmark...")
+        results_df = benchmark_runner(df, models, judge)
+
+        print("💾 Saving results...")
+        results_df.to_csv(SAVE_RESULTS_PATH, index=False)
+
+        print("📊 Analyzing overall results...")
+        analyze_results(results_df, scope="overall")
+
+    elif strategy == "one_by_one":
+        print("🤖 Running one model at a time with memory release...")
+        all_results = []
+
+        for cfg in MODEL_CONFIGS:
+            model_name = cfg.get("name", "model")
+            safe_model_name = sanitize_name(model_name)
+            per_model_output_dir = os.path.join("results", "per_model", safe_model_name)
+            os.makedirs(per_model_output_dir, exist_ok=True)
+
+            print(f"\n🤖 Initializing model: {model_name}")
+            model = init_model(cfg)
+
+            print(f"🚀 Running benchmark for: {model_name}")
+            model_results_df = benchmark_runner(df, [model], judge)
+            all_results.append(model_results_df)
+
+            model_output_path = os.path.join(per_model_output_dir, "output.csv")
+            model_results_df.to_csv(model_output_path, index=False)
+            print(f"💾 Saved model results to: {model_output_path}")
+
+            print(f"📊 Analyzing model results: {model_name}")
+            analyze_results(model_results_df, scope=f"per_model/{safe_model_name}")
+
+            print(f"🧹 Releasing resources for: {model_name}")
+            release_model_resources(model)
+            del model
+
+        print("🧾 Combining results from all models...")
+        results_df = pd.concat(all_results, ignore_index=True) if all_results else pd.DataFrame()
+        results_df.to_csv(SAVE_RESULTS_PATH, index=False)
+
+        print("📊 Analyzing combined overall results...")
+        analyze_results(results_df, scope="overall")
+
+    else:
+        raise ValueError(
+            "Invalid MODEL_LOADING_STRATEGY. Use 'all_at_once' or 'one_by_one'."
+        )
 
     print("\n✅ Benchmark Completed Successfully!")

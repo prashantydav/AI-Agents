@@ -1,5 +1,6 @@
 import os
 import time
+import gc
 
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -78,3 +79,18 @@ class HuggingFaceModel:
                     return f"ERROR: {error_msg}"
 
         return f"ERROR: {error_msg}"
+
+    def unload(self):
+        if hasattr(self, "model"):
+            del self.model
+        if hasattr(self, "tokenizer"):
+            del self.tokenizer
+
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            try:
+                torch.cuda.ipc_collect()
+            except Exception:
+                pass
+
+        gc.collect()
