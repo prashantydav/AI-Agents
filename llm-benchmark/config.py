@@ -28,7 +28,7 @@ VLLM_ENFORCE_EAGER = _env_bool("VLLM_ENFORCE_EAGER", False)
 # ---------------------------
 # Dataset
 # ---------------------------
-DATASET_PATH = "data/simple_qa_test_set.csv"
+DATASET_PATH = "data/sample_absa.xlsx"
 
 
 # ---------------------------
@@ -59,12 +59,12 @@ MODEL_CONFIGS = [
     #     "temperature": 0.2,
     #     "max_tokens": 512
     # },
-    {
-        "name": "gpt-4o",
-        "provider": "openai",
-        "temperature": 0.2,
-        "max_tokens": 512
-    },
+    # {
+    #     "name": "gpt-4o",
+    #     "provider": "openai",
+    #     "temperature": 0.2,
+    #     "max_tokens": 512
+    # },
     {
         "name": "openai/gpt-oss-20b",
         "provider": "huggingface",
