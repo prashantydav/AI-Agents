@@ -5,6 +5,5 @@ ollama
 datasets
 pandas
 matplotlib
-transformers
-torch
+vllm
 python-dotenv

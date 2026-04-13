@@ -9,6 +9,22 @@ HF_MODEL_PATH_1 = os.getenv("HF_MODEL_PATH_1", "/path/to/downloaded-models/googl
 HF_MODEL_PATH_2 = os.getenv("HF_MODEL_PATH_2", "/path/to/downloaded-models/Qwen/Qwen2.5-3B-Instruct")
 HF_MODEL_PATH_3 = os.getenv("HF_MODEL_PATH_3", "/path/to/downloaded-models/deepseek-ai/DeepSeek-R1-Distill-Qwen-7B")
 
+
+def _env_bool(name: str, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in ("1", "true", "yes", "on")
+
+
+VLLM_TENSOR_PARALLEL_SIZE = int(os.getenv("VLLM_TENSOR_PARALLEL_SIZE", "1"))
+VLLM_GPU_MEMORY_UTILIZATION = float(os.getenv("VLLM_GPU_MEMORY_UTILIZATION", "0.9"))
+VLLM_MAX_MODEL_LEN = os.getenv("VLLM_MAX_MODEL_LEN")
+VLLM_MAX_MODEL_LEN = int(VLLM_MAX_MODEL_LEN) if VLLM_MAX_MODEL_LEN else None
+VLLM_DTYPE = os.getenv("VLLM_DTYPE", "auto")
+VLLM_TRUST_REMOTE_CODE = _env_bool("VLLM_TRUST_REMOTE_CODE", True)
+VLLM_ENFORCE_EAGER = _env_bool("VLLM_ENFORCE_EAGER", False)
+
 # ---------------------------
 # Dataset
 # ---------------------------
@@ -54,21 +70,39 @@ MODEL_CONFIGS = [
         "provider": "huggingface",
         "path": HF_MODEL_PATH_1,
         "temperature": 1,
-        "max_tokens": 512
+        "max_tokens": 512,
+        "tensor_parallel_size": VLLM_TENSOR_PARALLEL_SIZE,
+        "gpu_memory_utilization": VLLM_GPU_MEMORY_UTILIZATION,
+        "max_model_len": VLLM_MAX_MODEL_LEN,
+        "dtype": VLLM_DTYPE,
+        "trust_remote_code": VLLM_TRUST_REMOTE_CODE,
+        "enforce_eager": VLLM_ENFORCE_EAGER,
     },
     {
         "name": "Qwen/Qwen3-8B",
         "provider": "huggingface",
         "path": HF_MODEL_PATH_2,
         "temperature": 1,
-        "max_tokens": 512
+        "max_tokens": 512,
+        "tensor_parallel_size": VLLM_TENSOR_PARALLEL_SIZE,
+        "gpu_memory_utilization": VLLM_GPU_MEMORY_UTILIZATION,
+        "max_model_len": VLLM_MAX_MODEL_LEN,
+        "dtype": VLLM_DTYPE,
+        "trust_remote_code": VLLM_TRUST_REMOTE_CODE,
+        "enforce_eager": VLLM_ENFORCE_EAGER,
     },
     {
         "name": "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
         "provider": "huggingface",
         "path": HF_MODEL_PATH_3,
         "temperature": 1,
-        "max_tokens": 512
+        "max_tokens": 512,
+        "tensor_parallel_size": VLLM_TENSOR_PARALLEL_SIZE,
+        "gpu_memory_utilization": VLLM_GPU_MEMORY_UTILIZATION,
+        "max_model_len": VLLM_MAX_MODEL_LEN,
+        "dtype": VLLM_DTYPE,
+        "trust_remote_code": VLLM_TRUST_REMOTE_CODE,
+        "enforce_eager": VLLM_ENFORCE_EAGER,
     },
 ]
 

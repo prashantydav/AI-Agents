@@ -2,8 +2,7 @@ import os
 import time
 import gc
 
-import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from vllm import LLM, SamplingParams
 
 
 class HuggingFaceModel:
@@ -15,6 +14,12 @@ class HuggingFaceModel:
         max_tokens: int = 512,
         timeout: int = 60,
         retry_count: int = 2,
+        tensor_parallel_size: int = 1,
+        gpu_memory_utilization: float = 0.9,
+        max_model_len: int = None,
+        dtype: str = "auto",
+        trust_remote_code: bool = True,
+        enforce_eager: bool = False,
     ):
         self.model_path = model_path
         self.model_name = model_name or os.path.basename(os.path.normpath(model_path))
@@ -22,54 +27,48 @@ class HuggingFaceModel:
         self.max_tokens = max_tokens
         self.timeout = timeout
         self.retry_count = retry_count
+        self.tensor_parallel_size = tensor_parallel_size
+        self.gpu_memory_utilization = gpu_memory_utilization
+        self.max_model_len = max_model_len
+        self.dtype = dtype
+        self.trust_remote_code = trust_remote_code
+        self.enforce_eager = enforce_eager
 
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.tokenizer = AutoTokenizer.from_pretrained(self.model_path, local_files_only=True)
-        self.model = AutoModelForCausalLM.from_pretrained(
-            self.model_path,
-            local_files_only=True,
-            torch_dtype=torch.float16 if self.device == "cuda" else torch.float32,
+        llm_kwargs = {
+            "model": self.model_path,
+            "tensor_parallel_size": self.tensor_parallel_size,
+            "gpu_memory_utilization": self.gpu_memory_utilization,
+            "dtype": self.dtype,
+            "trust_remote_code": self.trust_remote_code,
+            "enforce_eager": self.enforce_eager,
+        }
+        if self.max_model_len is not None:
+            llm_kwargs["max_model_len"] = self.max_model_len
+
+        self.llm = LLM(
+            **llm_kwargs
         )
-        self.model.to(self.device)
-
-        if self.tokenizer.pad_token_id is None:
-            self.tokenizer.pad_token_id = self.tokenizer.eos_token_id
 
     def generate(self, prompt: str) -> str:
         error_msg = "Unknown error"
 
         for attempt in range(self.retry_count + 1):
             try:
-                encoded = self.tokenizer(prompt, return_tensors="pt")
-                input_ids = encoded["input_ids"].to(self.device)
-                attention_mask = encoded.get("attention_mask")
-                if attention_mask is not None:
-                    attention_mask = attention_mask.to(self.device)
-
-                generation_config = {
-                    "input_ids": input_ids,
-                    "attention_mask": attention_mask,
-                    "max_new_tokens": self.max_tokens,
-                    "pad_token_id": self.tokenizer.pad_token_id,
-                }
-
-                if self.temperature and self.temperature > 0:
-                    generation_config["do_sample"] = True
-                    generation_config["temperature"] = self.temperature
-                else:
-                    generation_config["do_sample"] = False
+                sampling_params = SamplingParams(
+                    temperature=max(self.temperature, 0.0),
+                    max_tokens=self.max_tokens,
+                )
 
                 start_time = time.time()
-                with torch.no_grad():
-                    output_ids = self.model.generate(**generation_config)
+                outputs = self.llm.generate([prompt], sampling_params=sampling_params, use_tqdm=False)
+                _ = time.time() - start_time  # kept for consistency with other wrappers
 
-                new_tokens = output_ids[0][input_ids.shape[1] :]
-                output_text = self.tokenizer.decode(new_tokens, skip_special_tokens=True).strip()
+                output_text = ""
+                if outputs and outputs[0].outputs:
+                    output_text = outputs[0].outputs[0].text.strip()
 
                 if not output_text:
-                    return "ERROR: Empty response from local Hugging Face model"
-
-                _ = time.time() - start_time  # kept for consistency with other wrappers
+                    return "ERROR: Empty response from vLLM model"
                 return output_text
             except Exception as e:
                 error_msg = str(e)
@@ -81,16 +80,18 @@ class HuggingFaceModel:
         return f"ERROR: {error_msg}"
 
     def unload(self):
-        if hasattr(self, "model"):
-            del self.model
-        if hasattr(self, "tokenizer"):
-            del self.tokenizer
+        if hasattr(self, "llm"):
+            del self.llm
 
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-            try:
-                torch.cuda.ipc_collect()
-            except Exception:
-                pass
+        try:
+            import torch
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                try:
+                    torch.cuda.ipc_collect()
+                except Exception:
+                    pass
+        except Exception:
+            pass
 
         gc.collect()

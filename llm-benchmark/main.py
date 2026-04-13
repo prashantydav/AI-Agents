@@ -170,7 +170,13 @@ def init_model(cfg: dict):
             temperature=cfg["temperature"],
             max_tokens=cfg["max_tokens"],
             timeout=REQUEST_TIMEOUT,
-            retry_count=RETRY_COUNT
+            retry_count=RETRY_COUNT,
+            tensor_parallel_size=cfg.get("tensor_parallel_size", 1),
+            gpu_memory_utilization=cfg.get("gpu_memory_utilization", 0.9),
+            max_model_len=cfg.get("max_model_len"),
+            dtype=cfg.get("dtype", "auto"),
+            trust_remote_code=cfg.get("trust_remote_code", True),
+            enforce_eager=cfg.get("enforce_eager", False),
         )
     else:
         raise ValueError(f"Unsupported model provider: {cfg.get('provider')}")
