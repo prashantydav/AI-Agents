@@ -146,3 +146,9 @@ VERBOSE = True
 # - all_at_once: load all configured models first, then evaluate.
 # - one_by_one: load/evaluate/analyze/release each model sequentially.
 MODEL_LOADING_STRATEGY = os.getenv("MODEL_LOADING_STRATEGY", "all_at_once")
+
+# Inference control:
+# - True: run model inference and write fresh results.
+# - False: skip inference and analyze results from EXISTING_RESULTS_PATH.
+RUN_INFERENCE = _env_bool("RUN_INFERENCE", True)
+EXISTING_RESULTS_PATH = os.getenv("EXISTING_RESULTS_PATH", SAVE_RESULTS_PATH)

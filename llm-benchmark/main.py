@@ -50,6 +50,8 @@ def safe_parse_metadata(x):
 from config import (
     MODEL_CONFIGS,
     MODEL_LOADING_STRATEGY,
+    RUN_INFERENCE,
+    EXISTING_RESULTS_PATH,
     JUDGE_MODEL,
     OLLAMA_BASE_URL,
     DATASET_PATH,
@@ -112,6 +114,35 @@ def unwrap_model_output(raw_output):
     if raw_output is None:
         return ""
     return str(raw_output).strip()
+
+
+def extract_final_sentiment_label(text: str) -> str:
+    if text is None:
+        return "Unknown"
+
+    normalized = re.sub(r"\s+", " ", str(text)).strip()
+    if not normalized:
+        return "Unknown"
+
+    canonical = {
+        "positive": "Positive",
+        "negative": "Negative",
+        "neutral": "Neutral",
+    }
+
+    # Prefer explicit sentiment declarations and pick the final one.
+    sentiment_matches = list(
+        re.finditer(r"(?:final\s+)?sentiment\s*[:=\-]\s*(positive|negative|neutral)\b", normalized, flags=re.IGNORECASE)
+    )
+    if sentiment_matches:
+        return canonical[sentiment_matches[-1].group(1).lower()]
+
+    # Fallback: pick the last standalone sentiment token in the text.
+    label_matches = list(re.finditer(r"\b(positive|negative|neutral)\b", normalized, flags=re.IGNORECASE))
+    if label_matches:
+        return canonical[label_matches[-1].group(1).lower()]
+
+    return "Unknown"
 
 
 def ensure_results_dirs(base_path: str = "results", scope: str = "overall"):
@@ -344,18 +375,18 @@ def run_absa_benchmark(df: pd.DataFrame, models: List, judge=None) -> pd.DataFra
             # ---------------------------
             start_time = time.time()
             raw_output = model.generate(prompt)
-            output = unwrap_model_output(raw_output)
+            model_output_text = unwrap_model_output(raw_output)
+            output = extract_final_sentiment_label(model_output_text)
             latency = time.time() - start_time
 
-            # Normalize output (important)
-            # output = output.split("\n")[0]
+            ground_truth_label = extract_final_sentiment_label(ground_truth)
 
             # ---------------------------
             # Metric Score
             # ---------------------------
             metric_score = compute_score(
                 pred=output,
-                gt=ground_truth,
+                gt=ground_truth_label,
                 eval_type=eval_type
             )
 
@@ -366,7 +397,7 @@ def run_absa_benchmark(df: pd.DataFrame, models: List, judge=None) -> pd.DataFra
             judge_reason = None
 
             if judge:
-                judge_result = judge.judge(prompt, output, ground_truth)
+                judge_result = judge.judge(prompt, output, ground_truth_label)
                 judge_score = judge_result.get("score", 0)
                 judge_reason = judge_result.get("reason", "")
 
@@ -387,7 +418,8 @@ def run_absa_benchmark(df: pd.DataFrame, models: List, judge=None) -> pd.DataFra
                 "category": metadata.get("category", "absa"),
                 "text": text,
                 "aspect": aspect,
-                "ground_truth": ground_truth,
+                "ground_truth": ground_truth_label,
+                "raw_output": model_output_text,
                 "output": output,
                 "metric_score": metric_score,
                 "judge_score": judge_score,
@@ -397,7 +429,10 @@ def run_absa_benchmark(df: pd.DataFrame, models: List, judge=None) -> pd.DataFra
             })
 
             if VERBOSE:
-                print(f"✔ Test {idx} | GT: {ground_truth} | Pred: {output} | Score: {final_score:.2f}")
+                print(
+                    f"✔ Test {idx} | GT: {ground_truth_label} | Pred: {output} | "
+                    f"Raw: {model_output_text[:120]} | Score: {final_score:.2f}"
+                )
 
     return pd.DataFrame(results)
 
@@ -515,6 +550,22 @@ def analyze_results(df: pd.DataFrame, scope: str = "overall"):
 # ---------------------------
 if __name__ == "__main__":
 
+    os.makedirs("results", exist_ok=True)
+
+    if not RUN_INFERENCE:
+        print("⏭️ Inference disabled. Loading existing results...")
+        if not os.path.exists(EXISTING_RESULTS_PATH):
+            raise FileNotFoundError(
+                f"EXISTING_RESULTS_PATH not found: {EXISTING_RESULTS_PATH}"
+            )
+
+        results_df = pd.read_csv(EXISTING_RESULTS_PATH)
+        print(f"📂 Loaded: {EXISTING_RESULTS_PATH}")
+        print("📊 Analyzing loaded results...")
+        analyze_results(results_df, scope="overall")
+        print("\n✅ Analysis Completed Successfully!")
+        raise SystemExit(0)
+
     print("📂 Loading dataset...")
     df = load_dataset(DATASET_PATH)
     df = df.head(25)
@@ -522,7 +573,6 @@ if __name__ == "__main__":
     print("⚖️ Initializing judge...")
     judge = init_judge()
 
-    os.makedirs("results", exist_ok=True)
     benchmark_runner = run_absa_benchmark  # Keep existing default workflow.
 
     strategy = (MODEL_LOADING_STRATEGY or "all_at_once").strip().lower()
