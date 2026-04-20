@@ -58,6 +58,35 @@ Optional (for LangSmith observability):
 python main.py "What are the economic and environmental trade-offs of lithium iron phosphate batteries versus NMC batteries in grid storage?"
 ```
 
+## API mode (for Render)
+Run a web API locally:
+
+```bash
+uvicorn app:app --host 0.0.0.0 --port 8000
+```
+
+Health check:
+
+```bash
+curl http://localhost:8000/health
+```
+
+Research endpoint:
+
+```bash
+curl -X POST http://localhost:8000/research \
+  -H "Content-Type: application/json" \
+  -d '{"question":"Compare LFP vs NMC batteries for grid storage."}'
+```
+
+## Deploy on Render
+This repo includes a `render.yaml` Blueprint with:
+- `rootDir: react-research-agent`
+- start command: `uvicorn app:app --host 0.0.0.0 --port $PORT`
+- required env vars: `OPENAI_API_KEY`, `TAVILY_API_KEY`
+
+From Render dashboard, create a Blueprint service from this GitHub repo and set environment variables.
+
 Optional flags:
 - `--max-steps` (default: 10)
 - `--model` (default: `gpt-4.1-mini`)
