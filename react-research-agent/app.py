@@ -31,6 +31,16 @@ class ResearchResponse(BaseModel):
     report: str
 
 
+@app.get("/")
+def root() -> dict[str, str]:
+    return {
+        "message": "ReAct Research Agent API",
+        "health": "/health",
+        "research": "/research",
+        "docs": "/docs",
+    }
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
