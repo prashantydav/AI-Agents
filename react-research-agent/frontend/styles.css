@@ -29,6 +29,78 @@ body {
   gap: 16px;
 }
 
+.topbar {
+  background: #122449;
+  color: #fff;
+  border-radius: 14px;
+  padding: 14px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.brand {
+  font-weight: 700;
+}
+
+.assistant-strip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.state-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  border: 1px solid transparent;
+}
+
+.state-idle {
+  background: #edf2fc;
+  color: #1a2c56;
+  border-color: #d0ddf6;
+}
+
+.state-thinking {
+  background: #fff3d8;
+  color: #7a4a00;
+  border-color: #f6ddb0;
+}
+
+.state-using_tool {
+  background: #ddefff;
+  color: #17406c;
+  border-color: #bfdfff;
+}
+
+.state-finalizing {
+  background: #e8e2ff;
+  color: #3e2f7f;
+  border-color: #d5cafe;
+}
+
+.state-completed {
+  background: #dbf4e4;
+  color: #1f6a3a;
+  border-color: #bae8cb;
+}
+
+.state-failed {
+  background: #ffe2e4;
+  color: #8e2331;
+  border-color: #ffc2c8;
+}
+
+.tool-label {
+  font-size: 13px;
+  opacity: 0.95;
+}
+
 .card {
   background: var(--card);
   border: 1px solid var(--border);
@@ -151,6 +223,11 @@ button:disabled {
 }
 
 @media (max-width: 760px) {
+  .topbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
   .row {
     grid-template-columns: 1fr;
   }

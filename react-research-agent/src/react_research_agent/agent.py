@@ -239,8 +239,16 @@ class ReActResearchAgent:
         question: str,
         stream_final: bool = False,
         on_final_token: Optional[Callable[[str], None]] = None,
+        on_status: Optional[Callable[[Dict[str, object]], None]] = None,
     ) -> str:
+        self._emit_status(on_status, state="thinking", message="Thinking about the next best step.")
         for step in range(1, self.max_steps + 1):
+            self._emit_status(
+                on_status,
+                state="thinking",
+                message=f"Thinking (step {step}).",
+                step=step,
+            )
             raw = self._invoke_llm_step(question=question)
             try:
                 parsed = self.parse_react_output(raw)
@@ -264,11 +272,23 @@ class ReActResearchAgent:
                         "observation": observation,
                     }
                 )
+                self._emit_status(
+                    on_status,
+                    state="thinking",
+                    message=f"Model output parse issue at step {step}; retrying.",
+                    step=step,
+                )
                 continue
 
             action = parsed.action.strip().lower()
             if action not in self.VALID_ACTIONS:
                 observation = f"InvalidAction: '{action}'. Choose one of {sorted(self.VALID_ACTIONS)}"
+                self._emit_status(
+                    on_status,
+                    state="thinking",
+                    message=f"Invalid action '{action}' at step {step}; retrying.",
+                    step=step,
+                )
             elif action == "finish":
                 observation = f"Finish requested: {parsed.action_input}"
                 self.memory.steps.append(
@@ -289,9 +309,28 @@ class ReActResearchAgent:
                         "observation": observation,
                     }
                 )
+                self._emit_status(
+                    on_status,
+                    state="finalizing",
+                    message="Sufficient evidence collected. Finalizing report.",
+                    step=step,
+                )
                 break
             else:
+                self._emit_status(
+                    on_status,
+                    state="using_tool",
+                    message=f"Using tool: {action}",
+                    tool=action,
+                    step=step,
+                )
                 observation = self._run_tool_with_retry_and_fallback(action=action, action_input=parsed.action_input)
+                self._emit_status(
+                    on_status,
+                    state="thinking",
+                    message=f"Analyzing output from {action}.",
+                    step=step,
+                )
 
             if len(observation) > self.settings.max_observation_chars:
                 observation = observation[: self.settings.max_observation_chars] + "... [truncated]"
@@ -315,9 +354,30 @@ class ReActResearchAgent:
                 }
             )
 
+        self._emit_status(on_status, state="finalizing", message="Writing final report.")
         if stream_final:
-            return self._synthesize_report_stream(question=question, on_token=on_final_token)
-        return self._synthesize_report(question=question)
+            report = self._synthesize_report_stream(question=question, on_token=on_final_token)
+        else:
+            report = self._synthesize_report(question=question)
+        self._emit_status(on_status, state="completed", message="Research complete.")
+        return report
+
+    @staticmethod
+    def _emit_status(
+        on_status: Optional[Callable[[Dict[str, object]], None]],
+        state: str,
+        message: str,
+        tool: Optional[str] = None,
+        step: Optional[int] = None,
+    ) -> None:
+        if not on_status:
+            return
+        payload: Dict[str, object] = {"state": state, "message": message}
+        if tool:
+            payload["tool"] = tool
+        if step is not None:
+            payload["step"] = step
+        on_status(payload)
 
     def format_debug_trace(self) -> str:
         if not self.memory.steps:

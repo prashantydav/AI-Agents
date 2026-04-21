@@ -8,8 +8,16 @@
   </head>
   <body>
     <main class="shell">
+      <nav class="topbar">
+        <div class="brand">ReAct Research Agent</div>
+        <div class="assistant-strip">
+          <span id="agentStateBadge" class="state-badge state-idle">Idle</span>
+          <span id="agentToolText" class="tool-label"></span>
+        </div>
+      </nav>
+
       <section class="card">
-        <h1>ReAct Research Agent</h1>
+        <h1>Assistant</h1>
         <p class="subtitle">Ask a question and get a cited research report.</p>
 
         <form id="research-form" class="form">
