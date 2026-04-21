@@ -27,7 +27,7 @@ services:
       mkdir -p dist
       cp index.html styles.css app.js dist/
       printf "window.APP_CONFIG = { API_BASE_URL: '%s' };\n" "${API_BASE_URL:-http://localhost:8000}" > dist/config.js
-    staticPublishPath: ./dist
+    staticPublishPath: ./react-research-agent/frontend/dist
     autoDeploy: true
     routes:
       - type: rewrite
