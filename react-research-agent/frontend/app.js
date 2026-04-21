@@ -18,6 +18,42 @@ function setStatus(message, isError = false) {
   statusEl.classList.toggle("error", Boolean(isError));
 }
 
+function escapeHtml(text) {
+  return String(text)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function renderReport(markdownText) {
+  const lines = String(markdownText || "").split(/\r?\n/);
+  const html = [];
+
+  for (const line of lines) {
+    const trimmed = line.trimEnd();
+    if (!trimmed) {
+      html.push('<p>&nbsp;</p>');
+      continue;
+    }
+
+    if (trimmed.startsWith("## ")) {
+      html.push(`<h2 class="report-h2"><strong>${escapeHtml(trimmed.slice(3))}</strong></h2>`);
+      continue;
+    }
+
+    if (trimmed.startsWith("# ")) {
+      html.push(`<h1 class="report-h1"><strong>${escapeHtml(trimmed.slice(2))}</strong></h1>`);
+      continue;
+    }
+
+    html.push(`<p>${escapeHtml(trimmed)}</p>`);
+  }
+
+  reportEl.innerHTML = html.join("");
+}
+
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
 
@@ -39,7 +75,7 @@ form.addEventListener("submit", async (event) => {
   }
 
   submitEl.disabled = true;
-  reportEl.textContent = "Running research...";
+  renderReport("Running research...");
   setStatus("Sending request...");
 
   try {
@@ -55,11 +91,11 @@ form.addEventListener("submit", async (event) => {
       throw new Error(detail);
     }
 
-    reportEl.textContent = body.report || "No report returned.";
+    renderReport(body.report || "No report returned.");
     setStatus("Research complete.");
   } catch (error) {
     const message = error instanceof Error ? error.message : "Request failed.";
-    reportEl.textContent = "";
+    renderReport("");
     setStatus(message, true);
   } finally {
     submitEl.disabled = false;

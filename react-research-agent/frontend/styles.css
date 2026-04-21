@@ -120,13 +120,34 @@ button:disabled {
   min-height: 280px;
 }
 
-pre {
+.report-body {
   margin: 14px 0 0;
-  white-space: pre-wrap;
-  word-break: break-word;
   font-family: "IBM Plex Mono", "SFMono-Regular", Menlo, monospace;
   font-size: 13px;
   line-height: 1.55;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.report-body p {
+  margin: 0 0 10px;
+}
+
+.report-body .report-h1,
+.report-body .report-h2 {
+  margin: 14px 0 8px;
+  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+  font-weight: 700;
+}
+
+.report-body .report-h1 {
+  font-size: 28px;
+  line-height: 1.2;
+}
+
+.report-body .report-h2 {
+  font-size: 22px;
+  line-height: 1.25;
 }
 
 @media (max-width: 760px) {
