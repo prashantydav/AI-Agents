@@ -79,11 +79,28 @@ curl -X POST http://localhost:8000/research \
   -d '{"question":"Compare LFP vs NMC batteries for grid storage."}'
 ```
 
+## Frontend mode (for Render)
+A static frontend is available in `frontend/` and calls the API `/research` endpoint.
+
+To preview the static build locally:
+
+```bash
+cd frontend
+mkdir -p dist
+cp index.html styles.css app.js dist/
+printf "window.APP_CONFIG = { API_BASE_URL: '%s' };\n" "http://localhost:8000" > dist/config.js
+python -m http.server 4173 --directory dist
+```
+
 ## Deploy on Render
-This repo includes a `render.yaml` Blueprint with:
-- `rootDir: react-research-agent`
-- start command: `uvicorn app:app --host 0.0.0.0 --port $PORT`
-- required env vars: `OPENAI_API_KEY`, `TAVILY_API_KEY`
+This repo includes a `render.yaml` Blueprint with two services:
+- Backend API (`react-research-agent`)
+  - `rootDir: react-research-agent`
+  - start command: `uvicorn app:app --host 0.0.0.0 --port $PORT`
+  - required secrets: `OPENAI_API_KEY`, `TAVILY_API_KEY`
+- Static frontend (`react-research-agent-frontend`)
+  - `rootDir: react-research-agent/frontend`
+  - build generates `config.js` from backend `RENDER_EXTERNAL_URL`
 
 From Render dashboard, create a Blueprint service from this GitHub repo and set environment variables.
 

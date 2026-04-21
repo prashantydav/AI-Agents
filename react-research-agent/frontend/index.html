@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ReAct Research Agent</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="card">
+        <h1>ReAct Research Agent</h1>
+        <p class="subtitle">Ask a question and get a cited research report.</p>
+
+        <form id="research-form" class="form">
+          <label class="field">
+            <span>Question</span>
+            <textarea
+              id="question"
+              rows="5"
+              placeholder="Compare lithium iron phosphate and NMC batteries for grid storage."
+              required
+              minlength="3"
+            ></textarea>
+          </label>
+
+          <div class="row">
+            <label class="field">
+              <span>Max steps</span>
+              <input id="maxSteps" type="number" min="1" max="30" value="10" />
+            </label>
+
+            <label class="field">
+              <span>Model (optional)</span>
+              <input id="model" type="text" placeholder="gpt-4.1-mini" />
+            </label>
+          </div>
+
+          <button id="submit" type="submit">Run Research</button>
+        </form>
+
+        <p id="status" class="status" aria-live="polite"></p>
+      </section>
+
+      <section class="card output">
+        <h2>Report</h2>
+        <pre id="report">Your result will appear here.</pre>
+      </section>
+    </main>
+
+    <script src="./config.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>

@@ -1,7 +1,7 @@
 services:
   - type: web
     name: react-research-agent
-    env: python
+    runtime: python
     rootDir: react-research-agent
     plan: free
     buildCommand: pip install -r requirements.txt
@@ -15,3 +15,27 @@ services:
         sync: false
       - key: TAVILY_API_KEY
         sync: false
+      - key: CORS_ALLOW_ORIGINS
+        value: "*"
+
+  - type: web
+    name: react-research-agent-frontend
+    runtime: static
+    rootDir: react-research-agent/frontend
+    plan: free
+    buildCommand: |
+      mkdir -p dist
+      cp index.html styles.css app.js dist/
+      printf "window.APP_CONFIG = { API_BASE_URL: '%s' };\n" "${API_BASE_URL:-http://localhost:8000}" > dist/config.js
+    staticPublishPath: ./dist
+    autoDeploy: true
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: API_BASE_URL
+        fromService:
+          name: react-research-agent
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
